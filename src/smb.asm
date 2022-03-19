@@ -1404,9 +1404,16 @@ BackgroundColors:
       .byte $0f, $22, $0f, $0f ;used by background color control if set
 
 PlayerColors:
-      .byte $22, $16, $27, $18 ;mario's colors
-      .byte $22, $30, $27, $19 ;luigi's colors
-      .byte $22, $37, $27, $16 ;fiery (used by both)
+      .byte $16, $18 ;mario's colors
+      .byte $30, $19 ;luigi's colors
+      .byte $37, $16 ;fiery mario
+      .byte $37, $09 ;fiery luigi
+
+;unused data
+      .byte $ff,$ff,$ff,$ff
+      .byte $ff,$ff,$ff,$ff
+      .byte $ff,$ff,$ff,$ff
+      .byte $ff,$ff,$ff,$ff
 
 GetBackgroundColor:
            ldy BackgroundColorCtrl   ;check background color control
@@ -1414,26 +1421,19 @@ GetBackgroundColor:
            lda BGColorCtrl_Addr-4,y  ;put appropriate palette into vram
            sta VRAM_Buffer_AddrCtrl  ;note that if set to 5-7, $0301 will not be read
 NoBGColor: inc ScreenRoutineTask     ;increment to next subtask and plod on through
-      
+
 GetPlayerColors:
                ldx VRAM_Buffer1_Offset  ;get current buffer offset
-               ldy #$00
-               lda CurrentPlayer        ;check which player is on the screen
-               beq ChkFiery
-               ldy #$04                 ;load offset for luigi
-ChkFiery:      lda PlayerStatus         ;check player status
-               cmp #$02
-               bne StartClrGet          ;if fiery, load alternate offset for fiery player
-               ldy #$08
-StartClrGet:   lda #$03                 ;do four colors
-               sta $00
-ClrGetLoop:    lda PlayerColors,y       ;fetch player colors and store them
-               sta VRAM_Buffer1+3,x     ;in the buffer
-               iny
-               inx
-               dec $00
-               bpl ClrGetLoop
-               ldx VRAM_Buffer1_Offset  ;load original offset from before
+               lda #$27
+               sta VRAM_Buffer1+5,x
+               lda PlayerStatus
+               ora CurrentPlayer        ;check which player is on the screen
+               asl a
+               tay
+               lda PlayerColors,y
+               sta VRAM_Buffer1+4,x
+               lda PlayerColors+1,y
+               sta VRAM_Buffer1+6,x
                ldy BackgroundColorCtrl  ;if this value is four or greater, it will be set
                bne SetBGColor           ;therefore use it as offset to background color
                ldy AreaType             ;otherwise use area type bits from area offset as offset
