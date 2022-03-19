@@ -976,10 +976,10 @@ SelectBLogic: lda DemoTimer               ;if select or B pressed, check demo ti
               sta SelectTimer
               cpy #$01                    ;was the B button pressed earlier?  if so, branch
               beq IncWorldSel             ;note this will not be run if world selection is disabled
-              lda NumberOfPlayers         ;if no, must have been the select button, therefore
+              lda CurrentPlayer           ;if no, must have been the select button, therefore
               eor #%00000001              ;change number of players and draw icon accordingly
-              sta NumberOfPlayers
-              jsr DrawMushroomIcon
+              sta CurrentPlayer
+              jsr AdjustPlayerChoice
               jmp NullJoypad
 IncWorldSel:  ldx WorldSelectNumber       ;increment world select number
               inx
@@ -1047,7 +1047,7 @@ IconDataRead: lda MushroomIconData,y  ;note that the default position is set for
               sta VRAM_Buffer1-1,y    ;1-player game
               dey
               bpl IconDataRead
-              lda NumberOfPlayers     ;check number of players
+              lda CurrentPlayer     ;check number of players
               beq ExitIcon            ;if set to 1-player game, we're done
               lda #$24                ;otherwise, load blank tile in 1-player position
               sta VRAM_Buffer1+3
@@ -1671,7 +1671,7 @@ WriteGameText:
                cpy #$08                 ;if set to do time-up or game over,
                bcc Chk2Players          ;branch to check players
                ldy #$08                 ;otherwise warp zone, therefore set offset
-Chk2Players:   lda NumberOfPlayers      ;check for number of players
+Chk2Players:   lda CurrentPlayer        ;check for number of players
                bne LdGameText           ;if there are two, use current offset to also print name
                iny                      ;otherwise increment offset by one to not print name
 LdGameText:    ldx GameTextOffsets,y    ;get offset to message we want to print
@@ -1709,7 +1709,7 @@ PutLives:      sta VRAM_Buffer1+8
                rts
 
 CheckPlayerName:
-             lda NumberOfPlayers    ;check number of players
+             lda CurrentPlayer      ;check number of players
              beq ExitChkName        ;if only 1 player, leave
              lda CurrentPlayer      ;load current player
              dex                    ;check to see if current message number is for time up
@@ -2949,34 +2949,31 @@ ContinueGame:
            sta OperMode              ;game mode, because game is still on
 GameIsOn:  rts
 
+AdjustPlayerChoice:
+      lda #0
+      jsr WriteGameText
+      ldx #8
+      ldy #0
+:     lda MushroomIconData+1,y
+      sta VRAM_Buffer1,x
+      inx
+      iny
+      cpy #(DrawMushroomIcon-MushroomIconData-2)
+      bne :-
+      lda CurrentPlayer
+      beq :+
+      lda #$24
+      sta VRAM_Buffer1-3,x
+      lda #$ce
+      sta VRAM_Buffer1-1,x
+:     stx VRAM_Buffer1_Offset
+      jmp GetPlayerColors
 TransposePlayers:
-           sec                       ;set carry flag by default to end game
-           lda NumberOfPlayers       ;if only a 1 player game, leave
-           beq ExTrans
-           lda OffScr_NumberofLives  ;does offscreen player have any lives left?
-           bmi ExTrans               ;branch if not
-           lda CurrentPlayer         ;invert bit to update
-           eor #%00000001            ;which player is on the screen
-           sta CurrentPlayer
-           ldx #$06
-TransLoop: lda OnscreenPlayerInfo,x    ;transpose the information
-           pha                         ;of the onscreen player
-           lda OffscreenPlayerInfo,x   ;with that of the offscreen player
-           sta OnscreenPlayerInfo,x
-           pla
-           sta OffscreenPlayerInfo,x
-           dex
-           bpl TransLoop
-           clc            ;clear carry flag to get game going
-ExTrans:   rts
-
-;-------------------------------------------------------------------------------------
-
+      sec
 DoNothing1:
-      lda #$ff       ;this is residual code, this value is
-      sta $06c9      ;not used anywhere in the program
 DoNothing2:
       rts
+.byte $ff, $ff
 
 ;-------------------------------------------------------------------------------------
 
@@ -5238,7 +5235,7 @@ GameMode:
 
 GameCoreRoutine:
       ldx CurrentPlayer          ;get which player is on the screen
-      lda SavedJoypadBits,x      ;use appropriate player's controller bits
+      lda SavedJoypadBits        ;use appropriate player's controller bits
       sta SavedJoypadBits        ;as the master controller bits
       jsr GameRoutines           ;execute one of many possible subs
       lda OperMode_Task          ;check major task of operating mode
